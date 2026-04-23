@@ -2,6 +2,16 @@
 
 A toy price-time-priority matching engine for a prediction market.
 
+## Architecture
+
+One binary, two roles (`--role=api|matcher`).
+
+- **API servers** (any number): accept orders over HTTP, push them to a Redis stream, return. Serve the order book snapshot from Redis, stream fills to clients over WebSocket.
+- **Matcher** (exactly one): reads the stream, runs the in-memory order book, publishes fills and snapshots back to Redis.
+- **Redis** holds the shared state: the order stream, the fill channel, the snapshot, and the order-ID counter.
+
+API servers never touch the book. Stream position defines "time" for price-time priority.
+
 ## The hard parts
 
 ### Why a shared log instead of shared state
