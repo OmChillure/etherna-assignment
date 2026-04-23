@@ -1,0 +1,21 @@
+[package]
+name = "matcher"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.7", features = ["ws"] }
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+serde_json = "1"
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+redis = { version = "1.2.0", features = ["tokio-comp", "streams", "aio"] }
+clap = { version = "4.6.1", features = ["derive", "env"] }
+serde = { version = "1.0.288", features = ["derive"] }
+tokio-stream = "0.1.18"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }

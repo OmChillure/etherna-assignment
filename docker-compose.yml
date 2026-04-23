@@ -1,0 +1,29 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  matcher:
+    build: .
+    command: ["--role", "matcher", "--redis", "redis://redis:6379"]
+    depends_on:
+      - redis
+
+  api1:
+    build: .
+    command: ["--role", "api", "--bind", "0.0.0.0:8080", "--redis", "redis://redis:6379"]
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+      - matcher
+
+  api2:
+    build: .
+    command: ["--role", "api", "--bind", "0.0.0.0:8080", "--redis", "redis://redis:6379"]
+    ports:
+      - "8081:8080"
+    depends_on:
+      - redis
+      - matcher
