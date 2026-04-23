@@ -56,7 +56,13 @@ The matcher: one process, one core, one stream consumer. `POST`s stay fast but f
 
 **4. What would you build next with 4 more hours?**
 
-Checkpoint matcher `last_id` + book so restarts don't replay every fill. Then `DELETE/orders/:id` (the stream model handles this cleanly, just another event type). Then aproperty test that hammers concurrent `POST`s and asserts the no-double-match invariant.
+Checkpoint matcher `last_id` + book so restarts don't replay every fill.
+
+Then fix the matcher SPOF: a Redis lease for leader election with a standby matcher consuming the same stream — takes over on lease loss using the checkpointed state.
+
+Then `DELETE/orders/:id` (the stream model handles this cleanly, just another event type). 
+
+Then a property test that hammers concurrent `POST`s and asserts the no-double-match invariant.
 
 
 

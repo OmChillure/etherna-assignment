@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::{Context, Result};
 use redis::streams::{StreamReadOptions, StreamReadReply};
 use redis::AsyncCommands;
@@ -6,6 +8,8 @@ use crate::book::{match_order, Book};
 use crate::redis_io::{Redis, STREAM_ORDERS};
 use crate::types::Order;
 
+const IDLE_SLEEP: Duration = Duration::from_millis(50);
+
 pub async fn run(redis_url: String) -> Result<()> {
     let redis = Redis::connect(&redis_url).await?;
     let client = redis::Client::open(redis_url.as_str())?;
@@ -13,7 +17,7 @@ pub async fn run(redis_url: String) -> Result<()> {
 
     let mut book = Book::new();
     let mut last_id = "0".to_string();
-    let opts = StreamReadOptions::default().block(0).count(128);
+    let opts = StreamReadOptions::default().count(128);
 
     tracing::info!("matcher started");
 
@@ -23,11 +27,12 @@ pub async fn run(redis_url: String) -> Result<()> {
             .await
             .context("xread orders")?;
 
+        let mut processed = 0usize;
         for key in reply.keys {
             for entry in key.ids {
                 last_id = entry.id.clone();
                 let Some(data) = entry.map.get("data") else { continue };
-                let payload: String = redis::from_redis_value(data)?;
+                let payload: String = redis::from_redis_value(data.clone())?;
                 let order: Order = serde_json::from_str(&payload)
                     .context("decode order")?;
 
@@ -35,9 +40,14 @@ pub async fn run(redis_url: String) -> Result<()> {
                 for fill in &fills {
                     redis.publish_fill(fill).await?;
                 }
+                processed += 1;
             }
         }
 
-        redis.set_snapshot(&book.snapshot()).await?;
+        if processed > 0 {
+            redis.set_snapshot(&book.snapshot()).await?;
+        } else {
+            tokio::time::sleep(IDLE_SLEEP).await;
+        }
     }
 }
