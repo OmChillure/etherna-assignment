@@ -39,19 +39,23 @@ disk; this is documented as out of scope.
 ## Questions
 
 **1. How is double-matching prevented across API instances?**
+
 API servers never match they only `XADD` to a Redis stream and return. A single matcher.
 process consumes the stream, so there is exactly one book and one writer. Stream position
 gives a total order across instances, which defines "time" for price-time priority.
 
 **2. Why this order-book data structure?**
+
 `BTreeMap<Price, VecDeque<Order>>` per side. BTreeMap gives O(log n) best-price lookup
 (`keys().next()` / `keys().next_back()`); VecDeque gives O(1) FIFO within a level. Together
 that's price-then-time priority with no locks, because the matcher owns the booksingle-threaded.
 
 **3. What breaks first under real load?**
+
 The matcher: one process, one core, one stream consumer. `POST`s stay fast but fills fall behind the cursor and `GET /orderbook` goes stale. Close second: Redis pub/sub is lossy, so WS clients silently miss fills during any forwarder reconnect.
 
 **4. What would you build next with 4 more hours?**
+
 Checkpoint matcher `last_id` + book so restarts don't replay every fill. Then `DELETE/orders/:id` (the stream model handles this cleanly, just another event type). Then aproperty test that hammers concurrent `POST`s and asserts the no-double-match invariant.
 
 
@@ -63,6 +67,26 @@ docker compose up --build
 ```
 
 This starts Redis, one matcher, and two API servers on ports `8080` and `8081`.
+
+### Alternative: run without Docker
+
+Four terminals, one process each:
+
+```
+# terminal 1 — Redis
+redis-server
+
+# terminal 2 — matcher (the single book owner)
+cargo run --release -- --role matcher
+
+# terminal 3 — API instance 1
+cargo run --release -- --role api --bind 0.0.0.0:8080
+
+# terminal 4 — API instance 2
+cargo run --release -- --role api --bind 0.0.0.0:8081
+```
+
+Same endpoints, same behaviour. Drop terminal 4 if you don't need to demo multi-instance.
 
 ### Submit to one server, read from the other
 
